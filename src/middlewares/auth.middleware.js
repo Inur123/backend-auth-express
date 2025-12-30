@@ -1,8 +1,10 @@
 const jwt = require("jsonwebtoken");
+const { PrismaClient } = require("@prisma/client");
 const AppError = require("../utils/AppError");
-const { isTokenBlacklisted } = require("../utils/tokenBlacklist");
 
-module.exports = function authMiddleware(req, res, next) {
+const prisma = new PrismaClient();
+
+module.exports = async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
@@ -11,17 +13,24 @@ module.exports = function authMiddleware(req, res, next) {
 
   const token = header.replace("Bearer ", "").trim();
 
-  // ✅ CEK BLACKLIST
-  if (isTokenBlacklisted(token)) {
-    return next(new AppError("Unauthorized: token sudah logout", 401));
-  }
-
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = { userId: payload.sub };
-    req.token = token; // simpan token untuk logout
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(payload.sub) },
+      select: { id: true, tokenVersion: true },
+    });
+
+    if (!user) return next(new AppError("Unauthorized", 401));
+
+    // ✅ kunci invalidate token lama setelah logout (tokenVersion naik)
+    if (payload.tokenVersion !== user.tokenVersion) {
+      return next(new AppError("Unauthorized: token sudah tidak berlaku", 401));
+    }
+
+    req.auth = { userId: user.id };
     return next();
   } catch (e) {
-    return next(new AppError("Unauthorized: token tidak valid", 401));
+    return next(new AppError("Unauthorized: token tidak valid/expired", 401));
   }
 };

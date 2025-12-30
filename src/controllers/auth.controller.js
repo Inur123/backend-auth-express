@@ -1,8 +1,8 @@
 const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const { registerSchema, loginSchema } = require("../validators/auth.schema");
+const { updateProfileSchema } = require("../validators/profile.schema");
 const authService = require("../services/auth.service");
-const { blacklistToken } = require("../utils/tokenBlacklist");
 
 function validate(schema, body) {
   const result = schema.safeParse(body);
@@ -34,8 +34,7 @@ exports.login = asyncHandler(async (req, res) => {
 });
 
 exports.me = asyncHandler(async (req, res) => {
-  const userId = req.auth.userId;
-  const user = await authService.me(userId);
+  const user = await authService.me(req.auth.userId);
 
   res.json({
     message: "OK",
@@ -43,12 +42,27 @@ exports.me = asyncHandler(async (req, res) => {
   });
 });
 
-exports.logout = (req, res) => {
-  const token = req.token;
+exports.updateProfile = asyncHandler(async (req, res) => {
+  const result = updateProfileSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(422).json({
+      message: "Validation error",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
 
-  blacklistToken(token);
+  const user = await authService.updateProfile(req.auth.userId, result.data);
 
   res.json({
-    message: "Logout berhasil. Token sudah tidak bisa digunakan.",
+    message: "Profile berhasil diupdate",
+    data: { user },
   });
-};
+});
+
+exports.logout = asyncHandler(async (req, res) => {
+  await authService.logout(req.auth.userId);
+
+  res.json({
+    message: "Logout berhasil. Semua token lama tidak berlaku.",
+  });
+});
