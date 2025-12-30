@@ -2,6 +2,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const productService = require("../services/product.service");
 const { createProductSchema, updateProductSchema } = require("../validators/product.schema");
+const { broadcast } = require("../utils/sse");
 
 exports.list = asyncHandler(async (req, res) => {
   const products = await productService.list();
@@ -24,6 +25,10 @@ exports.create = asyncHandler(async (req, res) => {
   }
 
   const product = await productService.create(result.data);
+
+  // ✅ realtime notify
+  broadcast("products_changed", { action: "create", id: product.id });
+
   res.status(201).json({ message: "Product dibuat", data: { product } });
 });
 
@@ -32,7 +37,6 @@ exports.update = asyncHandler(async (req, res) => {
 
   const result = updateProductSchema.safeParse(req.body);
   if (!result.success) {
-    // refine error kadang masuk di formErrors
     const flat = result.error.flatten();
     return res.status(422).json({
       message: "Validation error",
@@ -41,11 +45,20 @@ exports.update = asyncHandler(async (req, res) => {
   }
 
   const product = await productService.update(id, result.data);
+
+  // ✅ realtime notify
+  broadcast("products_changed", { action: "update", id: product.id });
+
   res.json({ message: "Product diupdate", data: { product } });
 });
 
 exports.remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
   await productService.remove(id);
+
+  // ✅ realtime notify
+  broadcast("products_changed", { action: "delete", id: Number(id) });
+
   res.json({ message: "Product dihapus" });
 });
