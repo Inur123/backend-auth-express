@@ -3,6 +3,8 @@ const AppError = require("../utils/AppError");
 const { registerSchema, loginSchema } = require("../validators/auth.schema");
 const { updateProfileSchema } = require("../validators/profile.schema");
 const authService = require("../services/auth.service");
+const { broadcast } = require("../utils/sse");
+
 
 function validate(schema, body) {
   const result = schema.safeParse(body);
@@ -43,6 +45,8 @@ exports.me = asyncHandler(async (req, res) => {
 });
 
 exports.updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.auth.userId;
+
   const result = updateProfileSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(422).json({
@@ -51,13 +55,17 @@ exports.updateProfile = asyncHandler(async (req, res) => {
     });
   }
 
-  const user = await authService.updateProfile(req.auth.userId, result.data);
+  const user = await authService.updateProfile(userId, result.data);
+
+  // ✅ realtime notify (khusus user ini)
+  broadcast("profile_changed", { userId: Number(userId) });
 
   res.json({
     message: "Profile berhasil diupdate",
     data: { user },
   });
 });
+
 
 exports.logout = asyncHandler(async (req, res) => {
   await authService.logout(req.auth.userId);
