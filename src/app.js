@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 
 const routes = require("./routes");
 const errorMiddleware = require("./middlewares/error.middleware");
+const apiKeyMiddleware = require("./middlewares/apiKey.middleware");
 
 const app = express();
 
@@ -18,7 +19,8 @@ app.use(rateLimit({ windowMs: 60_000, max: 120 }));
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
-app.use("/api", routes);
+// ✅ PROTECT API ROUTES
+app.use("/api", apiKeyMiddleware, routes);
 
 // 404
 app.use((req, res) => {
