@@ -8,19 +8,25 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   name         String
-  email        String   @unique
+  email        String    @unique
   passwordHash String
-  tokenVersion Int      @default(0)   // ⬅️ TAMBAH
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  tokenVersion Int       @default(0)
+  products     Product[]        // ✅ relasi balik
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
+
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
   price       Int
   description String?
+  userId      Int                      // ✅ kolom ini yang belum ada di DB kamu
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }

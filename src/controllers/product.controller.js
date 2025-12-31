@@ -1,21 +1,24 @@
 const asyncHandler = require("../utils/asyncHandler");
-const AppError = require("../utils/AppError");
 const productService = require("../services/product.service");
 const { createProductSchema, updateProductSchema } = require("../validators/product.schema");
 const { broadcast } = require("../utils/sse");
 
 exports.list = asyncHandler(async (req, res) => {
-  const products = await productService.list();
+  const userId = Number(req.auth.userId);
+  const products = await productService.list(userId);
   res.json({ message: "OK", data: { products } });
 });
 
 exports.detail = asyncHandler(async (req, res) => {
+  const userId = Number(req.auth.userId);
   const { id } = req.params;
-  const product = await productService.detail(id);
+  const product = await productService.detail(userId, id);
   res.json({ message: "OK", data: { product } });
 });
 
 exports.create = asyncHandler(async (req, res) => {
+  const userId = Number(req.auth.userId);
+
   const result = createProductSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(422).json({
@@ -24,15 +27,16 @@ exports.create = asyncHandler(async (req, res) => {
     });
   }
 
-  const product = await productService.create(result.data);
+  const product = await productService.create(userId, result.data);
 
-  // ✅ realtime notify
-  broadcast("products_changed", { action: "create", id: product.id });
+  // ✅ realtime notify + kirim userId supaya FE bisa filter
+  broadcast("products_changed", { action: "create", id: product.id, userId });
 
   res.status(201).json({ message: "Product dibuat", data: { product } });
 });
 
 exports.update = asyncHandler(async (req, res) => {
+  const userId = Number(req.auth.userId);
   const { id } = req.params;
 
   const result = updateProductSchema.safeParse(req.body);
@@ -44,21 +48,20 @@ exports.update = asyncHandler(async (req, res) => {
     });
   }
 
-  const product = await productService.update(id, result.data);
+  const product = await productService.update(userId, id, result.data);
 
-  // ✅ realtime notify
-  broadcast("products_changed", { action: "update", id: product.id });
+  broadcast("products_changed", { action: "update", id: product.id, userId });
 
   res.json({ message: "Product diupdate", data: { product } });
 });
 
 exports.remove = asyncHandler(async (req, res) => {
+  const userId = Number(req.auth.userId);
   const { id } = req.params;
 
-  await productService.remove(id);
+  await productService.remove(userId, id);
 
-  // ✅ realtime notify
-  broadcast("products_changed", { action: "delete", id: Number(id) });
+  broadcast("products_changed", { action: "delete", id: Number(id), userId });
 
   res.json({ message: "Product dihapus" });
 });
